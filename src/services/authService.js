@@ -1,0 +1,53 @@
+// services/authService.js
+// Registro / login. Guarda el usuario y token localmente para operar offline
+// y sincronizar cuando vuelva la conexión (puente SMS/USSD para zonas sin señal).
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiRequest } from '../config/api';
+
+const PENDING_KEY = '@pending_registrations';
+
+export async function registerUser(payload) {
+  try {
+    const data = await apiRequest('/auth/register', {
+      method: 'POST',
+      body: payload,
+      auth: false,
+    });
+    return data;
+  } catch (err) {
+    // Sin conexión: guardamos localmente para reenviar luego
+    // (por API o por el puente SMS/USSD simulado con Twilio).
+    const pendingRaw = await AsyncStorage.getItem(PENDING_KEY);
+    const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
+    pending.push({ ...payload, _queuedAt: new Date().toISOString() });
+    await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+    throw new Error(
+      'No hay conexión. Tu registro se guardó en este dispositivo y se enviará automáticamente cuando haya señal.'
+    );
+  }
+}
+
+export async function loginUser({ identifier, password, remember }) {
+  const data = await apiRequest('/auth/login', {
+    method: 'POST',
+    body: { identifier, password },
+    auth: false,
+  });
+
+  await AsyncStorage.setItem('@auth_token', data.token);
+  await AsyncStorage.setItem('@auth_user', JSON.stringify(data.usuario));
+  if (remember) {
+    await AsyncStorage.setItem('@auth_remember', 'true');
+  }
+  return data.usuario; // { id, nombre_completo, rol, ... }
+}
+
+export async function logoutUser() {
+  await AsyncStorage.multiRemove(['@auth_token', '@auth_user']);
+}
+
+export async function getStoredUser() {
+  const raw = await AsyncStorage.getItem('@auth_user');
+  return raw ? JSON.parse(raw) : null;
+}
