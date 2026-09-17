@@ -1,6 +1,9 @@
 // config/api.js
-// Cliente HTTP centralizado. Ajusta API_BASE_URL a tu backend Flask local.
-// En el emulador Android, "10.0.2.2" apunta al localhost de tu PC.
+// Cliente HTTP centralizado. Ajusta API_BASE_URL con la IP LOCAL de tu
+// computador en la misma red WiFi que tu celular (no uses 10.0.2.2: eso es
+// solo para el emulador de Android, y este proyecto se prueba con Expo Go en
+// un dispositivo físico). Ver instrucciones para obtener tu IP con
+// `ipconfig` en Windows.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

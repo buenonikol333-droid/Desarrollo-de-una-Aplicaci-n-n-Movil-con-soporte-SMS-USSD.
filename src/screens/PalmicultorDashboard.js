@@ -148,12 +148,26 @@ export default function PalmicultorDashboard({ navigation }) {
       {/* Accesos directos agronómicos */}
       <Text style={styles.sectionTitle}>Mi Finca</Text>
       <View style={styles.gridRow}>
-        <ShortcutCard icon="leaf-outline" title="Mis Lotes" onPress={() => navigation.navigate('Lotes')} />
+        <ShortcutCard icon="leaf-outline" title="Mis Fincas y Lotes" onPress={() => navigation.navigate('Fincas')} />
         <ShortcutCard icon="bar-chart-outline" title="Producción" onPress={() => navigation.navigate('Produccion')} />
       </View>
       <View style={styles.gridRow}>
         <ShortcutCard icon="trending-up-outline" title="Pronósticos" onPress={() => navigation.navigate('Pronosticos')} />
         <ShortcutCard icon="notifications-outline" title="Alertas de Cosecha" onPress={() => navigation.navigate('Alertas')} />
+      </View>
+
+      {/* Mercado */}
+      <Text style={styles.sectionTitle}>Mercado</Text>
+      <View style={styles.gridRow}>
+        <ShortcutCard icon="storefront-outline" title="Mis Publicaciones" onPress={() => navigation.navigate('MisPublicaciones')} />
+        <ShortcutCard icon="flask-outline" title="Balance Industrial" onPress={() => navigation.navigate('BalanceIndustrial')} />
+      </View>
+
+      {/* Herramientas */}
+      <Text style={styles.sectionTitle}>Herramientas</Text>
+      <View style={styles.gridRow}>
+        <ShortcutCard icon="chatbubble-ellipses-outline" title="Simulador SMS/USSD" onPress={() => navigation.navigate('SmsSimulador')} />
+        <ShortcutCard icon="person-outline" title="Mi Perfil" onPress={() => navigation.navigate('Perfil')} />
       </View>
     </ScrollView>
   );
