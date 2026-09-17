@@ -14,7 +14,7 @@ const SIGUIENTE_ESTADO = {
 
 const ESTADO_TONE = { Aceptada: 'primary', 'En preparación': 'warning', 'En tránsito': 'warning', Entregada: 'success' };
 
-export default function MisSolicitudesScreen() {
+export default function MisSolicitudesScreen({ navigation }) {
   const [solicitudes, setSolicitudes] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -62,8 +62,15 @@ export default function MisSolicitudesScreen() {
               <Text style={styles.linea}>{item.ubicacion_exacta.direccion || `${item.ubicacion_exacta.lat}, ${item.ubicacion_exacta.long}`}</Text>
             </View>
           ) : null}
+          <PrimaryButton
+            title="Ver mapa de la ruta"
+            variant="secondary"
+            icon="map-outline"
+            onPress={() => navigation.navigate('RutaMap', { solicitudId: item.id })}
+            style={{ marginTop: spacing.md }}
+          />
           {SIGUIENTE_ESTADO[item.estado] && (
-            <PrimaryButton title={`Marcar: ${SIGUIENTE_ESTADO[item.estado]}`} onPress={() => avanzar(item)} style={{ marginTop: spacing.md }} />
+            <PrimaryButton title={`Marcar: ${SIGUIENTE_ESTADO[item.estado]}`} onPress={() => avanzar(item)} style={{ marginTop: spacing.sm }} />
           )}
         </Card>
       )}

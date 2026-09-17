@@ -1,9 +1,9 @@
 // App.js
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import LoginScreen from './src/screens/LoginScreen';
@@ -48,12 +48,15 @@ import AdminReportesScreen from './src/screens/admin/AdminReportesScreen';
 
 import EstadoViasScreen from './src/screens/common/EstadoViasScreen';
 import PerfilScreen from './src/screens/common/PerfilScreen';
+import RutaMapScreen from './src/screens/common/RutaMapScreen';
 
 import { colors } from './src/theme/theme';
 import { getStoredUser } from './src/services/authService';
 import { sincronizarTodo } from './src/services/offlineSync';
+import { initNotifications, addNotificationTapListener } from './src/services/notificationsService';
 
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef();
 
 const DASHBOARD_BY_ROLE = {
   palmicultor: 'PalmicultorDashboard',
@@ -72,6 +75,14 @@ export default function App() {
       // Intenta vaciar las colas offline (censos y registros pendientes) al abrir la app.
       sincronizarTodo().catch(() => {});
     })();
+
+    initNotifications();
+    const sub = addNotificationTapListener((data) => {
+      if (data?.enlace && navigationRef.isReady()) {
+        navigationRef.navigate(data.enlace);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   if (!initialRoute) {
@@ -83,7 +94,7 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <StatusBar style="dark" />
       <Stack.Navigator
         initialRouteName={initialRoute}
@@ -142,6 +153,7 @@ export default function App() {
         {/* --- Compartidas --- */}
         <Stack.Screen name="EstadoVias" component={EstadoViasScreen} options={{ title: 'Estado de vías' }} />
         <Stack.Screen name="Perfil" component={PerfilScreen} options={{ title: 'Mi perfil' }} />
+        <Stack.Screen name="RutaMap" component={RutaMapScreen} options={{ title: 'Mapa de la ruta' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

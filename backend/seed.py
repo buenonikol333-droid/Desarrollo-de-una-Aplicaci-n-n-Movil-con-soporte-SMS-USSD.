@@ -78,10 +78,15 @@ def run():
                 telefono=comprador_user.telefono,
                 correo=comprador_user.correo,
                 ubicacion="Zona industrial, Tumaco",
+                latitud=1.7912,
+                longitud=-78.7813,
                 estado="activo",
             )
             db.session.add(comprador)
             db.session.flush()
+        elif comprador.latitud is None or comprador.longitud is None:
+            comprador.latitud = 1.7912
+            comprador.longitud = -78.7813
 
         if not Precio.query.filter_by(comprador_id=comprador.id).first():
             db.session.add(

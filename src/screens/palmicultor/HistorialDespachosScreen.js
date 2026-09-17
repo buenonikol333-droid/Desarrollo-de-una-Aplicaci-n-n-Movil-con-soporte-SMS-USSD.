@@ -64,6 +64,13 @@ export default function HistorialDespachosScreen({ navigation }) {
             <Text style={styles.linea}>Punto exacto: {item.ubicacion_exacta.direccion || `${item.ubicacion_exacta.lat}, ${item.ubicacion_exacta.long}`}</Text>
           ) : null}
           {item.motivo_rechazo ? <Text style={styles.linea}>Motivo de rechazo: {item.motivo_rechazo}</Text> : null}
+          <PrimaryButton
+            title="Ver mapa de la ruta"
+            variant="secondary"
+            icon="map-outline"
+            onPress={() => navigation.navigate('RutaMap', { solicitudId: item.id })}
+            style={{ marginTop: spacing.sm }}
+          />
         </Card>
       )}
       ListEmptyComponent={<EmptyState icon="time-outline" title="Sin despachos todavía" subtitle="Aquí verás el historial de tus solicitudes de transporte." />}

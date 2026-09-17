@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, typography } from '../../theme/theme';
 import { Card, PrimaryButton, EmptyState, Badge } from '../../components/ui';
 import { listarAlertas, marcarAlertaLeida, marcarTodasLeidas } from '../../services/alertasService';
+import { notificarAlertasNuevas } from '../../services/notificationsService';
 
 const TIPO_ICON = { cosecha: 'leaf-outline', logistica: 'car-outline' };
 
@@ -16,6 +17,7 @@ export default function AlertasScreen({ navigation }) {
   const load = useCallback(async () => {
     const data = await listarAlertas();
     setAlertas(data);
+    notificarAlertasNuevas(data).catch(() => {});
   }, []);
 
   useFocusEffect(

@@ -464,6 +464,18 @@ def _serialize_solicitud(s: SolicitudTransporte, detalle=False):
             "long": finca.coordenadas_long if finca else None,
         }
 
+    # El destino (comprador/planta) no es información privada de finca (RN06
+    # solo protege el origen), así que sus coordenadas siempre se incluyen
+    # cuando existen — sirven para el mapa de ruta.
+    if s.comprador_id:
+        comprador = Comprador.query.get(s.comprador_id)
+        if comprador and comprador.latitud is not None and comprador.longitud is not None:
+            data["destino_coords"] = {
+                "lat": comprador.latitud,
+                "long": comprador.longitud,
+                "etiqueta": comprador.empresa,
+            }
+
     if detalle:
         data["observaciones"] = s.observaciones
 
