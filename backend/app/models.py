@@ -71,10 +71,13 @@ class CicloCosecha(db.Model):
     fecha_ultima_cosecha = db.Column(db.Date)
     fecha_inicio = db.Column(db.Date)
     duracion_dias = db.Column(db.Integer)  # 7-12 jóvenes / 9-15 adultas (RN03)
+    dias_anticipacion_alerta = db.Column(db.Integer, default=3)  # 1-7 días (RN03)
     proxima_fecha_estimada = db.Column(db.Date)
     observaciones = db.Column(db.Text)
     estado = db.Column(db.String(20), default="Programado")
     # Programado | Próximo | En curso | Completado | Retrasado
+
+    alertas = db.relationship("Notificacion", backref="ciclo_cosecha", lazy=True)
 
 
 class RegistroPolinizacion(db.Model):
@@ -106,6 +109,10 @@ class RegistroProduccion(db.Model):
     peso_promedio_racimo = db.Column(db.Float)
     fruto_suelto = db.Column(db.Float)
     observaciones = db.Column(db.Text)
+    fuente = db.Column(db.String(20), default="app")  # app | sms | ussd
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    pronosticos = db.relationship("PronosticoProduccion", backref="registro_produccion", lazy=True)
 
 
 class PronosticoProduccion(db.Model):
@@ -223,3 +230,18 @@ class Notificacion(db.Model):
     mensaje = db.Column(db.Text)
     leida = db.Column(db.Boolean, default=False)
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PublicacionMercado(db.Model):
+    __tablename__ = "publicaciones_mercado"
+
+    id = db.Column(db.Integer, primary_key=True)
+    palmicultor_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    lote_id = db.Column(db.Integer, db.ForeignKey("lotes.id"), nullable=True)
+    cantidad_toneladas = db.Column(db.Float, nullable=False)
+    precio_esperado = db.Column(db.Numeric(12, 2))
+    unidad = db.Column(db.String(50), default="Tonelada")
+    municipio = db.Column(db.String(100), default="Tumaco")
+    descripcion = db.Column(db.Text)
+    estado = db.Column(db.String(20), default="activa")  # activa | vendida | cancelada
+    fecha_publicacion = db.Column(db.DateTime, default=datetime.utcnow)
