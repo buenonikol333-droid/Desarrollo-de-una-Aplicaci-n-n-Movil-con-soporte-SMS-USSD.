@@ -1,27 +1,59 @@
 // services/notificationsService.js
 // Notificaciones LOCALES (no push remoto): se programan/disparan desde el
 // propio dispositivo cuando la app detecta alertas nuevas (cosecha próxima,
-// cambios de estado de logística, etc.), sin depender de un servidor de push.
+// cambios de estado de logística, etc.). El proyecto no usa ni ha usado
+// nunca push remoto (no hay getExpoPushTokenAsync, FCM ni registro de token
+// en el backend) — las alertas se generan en el backend y se entregan por
+// polling + notificación local, así que no hace falta ningún token.
 //
-// IMPORTANTE: desde el SDK 53 de Expo, Expo Go en Android ya NO incluye el
-// módulo nativo de expo-notifications (solo funciona en un development
-// build). Por eso TODA llamada a la librería aquí está protegida: si el
-// módulo nativo no está disponible, estas funciones simplemente no hacen
-// nada en vez de tumbar la app. En un development build o build de
-// producción, las notificaciones funcionan normalmente sin cambiar nada.
+// IMPORTANTE (limitación real de la plataforma, no un bug de este archivo):
+// desde el SDK 53 de Expo, Expo Go en ANDROID no incluye el módulo nativo de
+// expo-notifications — Expo lo retiró del cliente de Expo Go por completo
+// (no solo la parte de push remoto). Cualquier llamada ahí lanza
+// "...was removed from Expo Go...". En iOS Expo Go y en cualquier
+// development build o build de producción en Android, el módulo sí está
+// presente y esta misma implementación funciona sin cambios.
+//
+// Por eso detectamos el entorno ANTES de tocar la librería (en vez de
+// depender solo de try/catch, que no siempre alcanza a interceptar el error
+// interno del propio paquete): si estamos en Expo Go + Android, las
+// notificaciones simplemente quedan desactivadas con un aviso claro en
+// consola, y el resto de la app sigue funcionando igual.
 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const NOTIFIED_IDS_KEY = '@notified_alert_ids';
 const MAX_STORED_IDS = 300;
 
 let Notifications = null;
 let disponible = true;
+let avisoMostrado = false;
+
+function enExpoGoAndroid() {
+  const enExpoGo =
+    Constants.appOwnership === 'expo' ||
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  return Platform.OS === 'android' && enExpoGo;
+}
 
 function getNotificationsModule() {
   if (!disponible) return null;
   if (Notifications) return Notifications;
+
+  if (enExpoGoAndroid()) {
+    disponible = false;
+    if (!avisoMostrado) {
+      avisoMostrado = true;
+      console.warn(
+        '[notificaciones] Desactivadas en esta sesión: expo-notifications no está disponible en Expo Go para Android desde el SDK 53. ' +
+          'Funcionan normal en un development build (npx expo run:android / EAS Build) o en iOS Expo Go. El resto de la app no se ve afectado.'
+      );
+    }
+    return null;
+  }
+
   try {
     Notifications = require('expo-notifications');
     return Notifications;
