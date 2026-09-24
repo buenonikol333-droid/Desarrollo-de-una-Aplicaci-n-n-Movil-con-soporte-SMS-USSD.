@@ -1,12 +1,17 @@
+import random
+from datetime import datetime, timedelta
+
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+
 from app.extensions import db
-from app.models import Usuario, Comprador, Transportador
+from app.models import Usuario, Comprador, Transportador, PasswordResetToken
 
 auth_bp = Blueprint("auth", __name__)
 
 ROLES_VALIDOS = {"palmicultor", "comprador", "transportador", "administrador"}
+CODE_TTL_MINUTES = 15
 
 
 @auth_bp.post("/register")
@@ -45,7 +50,8 @@ def register():
     if rol == "comprador":
         db.session.add(Comprador(usuario_id=usuario.id, empresa=nombre_completo, ubicacion=ubicacion))
     elif rol == "transportador":
-        db.session.add(Transportador(usuario_id=usuario.id, ubicacion=ubicacion))
+        # Los transportadores quedan "pendiente" hasta validación del administrador.
+        db.session.add(Transportador(usuario_id=usuario.id, ubicacion=ubicacion, estado="pendiente"))
 
     db.session.commit()
 
@@ -74,6 +80,108 @@ def login():
 
     token = create_access_token(identity=str(usuario.id), additional_claims={"rol": usuario.rol})
     return jsonify({"token": token, "usuario": _serialize(usuario)}), 200
+
+
+@auth_bp.get("/me")
+@jwt_required()
+def me():
+    usuario = Usuario.query.get(int(get_jwt_identity()))
+    if not usuario:
+        return jsonify({"message": "Usuario no encontrado."}), 404
+    return jsonify(_serialize(usuario))
+
+
+@auth_bp.post("/forgot-password")
+def forgot_password():
+    """Genera un código de recuperación (RN: recuperar contraseña).
+
+    MOCK: no hay proveedor real de SMS/correo conectado todavía, así que el
+    código se devuelve directamente en la respuesta (`dev_codigo`) para que el
+    flujo se pueda probar de extremo a extremo. Cuando se conecte un
+    proveedor real (Twilio, SES, etc.) basta con enviar `codigo` por ese canal
+    en vez de incluirlo en la respuesta HTTP.
+    """
+    data = request.get_json(force=True) or {}
+    identifier = (data.get("identifier") or "").strip()
+
+    usuario = Usuario.query.filter(
+        (Usuario.telefono == identifier) | (Usuario.correo == identifier)
+    ).first()
+
+    # Por seguridad respondemos 200 exista o no la cuenta.
+    if not usuario:
+        return jsonify({"message": "Si la cuenta existe, se envió un código de verificación."}), 200
+
+    codigo = f"{random.randint(0, 999999):06d}"
+    token = PasswordResetToken(
+        usuario_id=usuario.id,
+        codigo=codigo,
+        expira_en=datetime.utcnow() + timedelta(minutes=CODE_TTL_MINUTES),
+    )
+    db.session.add(token)
+    db.session.commit()
+
+    return jsonify(
+        {
+            "message": "Si la cuenta existe, se envió un código de verificación.",
+            "dev_codigo": codigo,  # MOCK — remover al conectar proveedor SMS/correo real
+            "expira_minutos": CODE_TTL_MINUTES,
+        }
+    ), 200
+
+
+@auth_bp.post("/verify-code")
+def verify_code():
+    data = request.get_json(force=True) or {}
+    identifier = (data.get("identifier") or "").strip()
+    codigo = (data.get("codigo") or "").strip()
+
+    usuario = Usuario.query.filter(
+        (Usuario.telefono == identifier) | (Usuario.correo == identifier)
+    ).first()
+    if not usuario:
+        return jsonify({"message": "Código inválido o expirado."}), 400
+
+    token = (
+        PasswordResetToken.query.filter_by(usuario_id=usuario.id, codigo=codigo, usado=False)
+        .order_by(PasswordResetToken.creado_en.desc())
+        .first()
+    )
+    if not token or token.expira_en < datetime.utcnow():
+        return jsonify({"message": "Código inválido o expirado."}), 400
+
+    return jsonify({"message": "Código válido.", "valido": True}), 200
+
+
+@auth_bp.post("/reset-password")
+def reset_password():
+    data = request.get_json(force=True) or {}
+    identifier = (data.get("identifier") or "").strip()
+    codigo = (data.get("codigo") or "").strip()
+    nueva_password = data.get("password") or ""
+
+    if len(nueva_password) < 6:
+        return jsonify({"message": "La contraseña debe tener al menos 6 caracteres."}), 400
+
+    usuario = Usuario.query.filter(
+        (Usuario.telefono == identifier) | (Usuario.correo == identifier)
+    ).first()
+    if not usuario:
+        return jsonify({"message": "Código inválido o expirado."}), 400
+
+    token = (
+        PasswordResetToken.query.filter_by(usuario_id=usuario.id, codigo=codigo, usado=False)
+        .order_by(PasswordResetToken.creado_en.desc())
+        .first()
+    )
+    if not token or token.expira_en < datetime.utcnow():
+        return jsonify({"message": "Código inválido o expirado."}), 400
+
+    usuario.password_hash = generate_password_hash(nueva_password)
+    token.usado = True
+    db.session.commit()
+
+    return jsonify({"message": "Contraseña actualizada correctamente."}), 200
 
 
 def _serialize(usuario: Usuario):

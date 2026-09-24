@@ -51,3 +51,39 @@ export async function getStoredUser() {
   const raw = await AsyncStorage.getItem('@auth_user');
   return raw ? JSON.parse(raw) : null;
 }
+
+export async function syncPendingRegistrations() {
+  const pendingRaw = await AsyncStorage.getItem(PENDING_KEY);
+  const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
+  if (!pending.length) return { enviados: 0, pendientes: 0 };
+
+  const restantes = [];
+  let enviados = 0;
+  for (const payload of pending) {
+    const { _queuedAt, ...body } = payload;
+    try {
+      await apiRequest('/auth/register', { method: 'POST', body, auth: false });
+      enviados += 1;
+    } catch (_e) {
+      restantes.push(payload);
+    }
+  }
+  await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(restantes));
+  return { enviados, pendientes: restantes.length };
+}
+
+export async function forgotPassword(identifier) {
+  return apiRequest('/auth/forgot-password', { method: 'POST', body: { identifier }, auth: false });
+}
+
+export async function verifyResetCode(identifier, codigo) {
+  return apiRequest('/auth/verify-code', { method: 'POST', body: { identifier, codigo }, auth: false });
+}
+
+export async function resetPassword(identifier, codigo, password) {
+  return apiRequest('/auth/reset-password', {
+    method: 'POST',
+    body: { identifier, codigo, password },
+    auth: false,
+  });
+}

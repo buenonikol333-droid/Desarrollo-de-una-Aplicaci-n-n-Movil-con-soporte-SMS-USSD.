@@ -17,11 +17,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, radius, MIN_TOUCH_TARGET } from '../theme/theme';
 import { getPrecioVigente, getCompradoresCercanos } from '../services/marketService';
 import { getEstadoLogistica } from '../services/logisticsService';
+import { listarAlertas } from '../services/alertasService';
+import { notificarAlertasNuevas } from '../services/notificationsService';
 
 export default function PalmicultorDashboard({ navigation }) {
   const [precio, setPrecio] = useState(null);
   const [compradores, setCompradores] = useState([]);
   const [logistica, setLogistica] = useState(null);
+  const [alertasNoLeidas, setAlertasNoLeidas] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -38,6 +41,14 @@ export default function PalmicultorDashboard({ navigation }) {
       // En modo offline se usan los últimos valores en caché local.
       console.warn('No se pudo actualizar desde el servidor, usando caché local.', e?.message);
     }
+
+    // Revisa alertas de cosecha/logística y dispara notificaciones locales de las nuevas.
+    listarAlertas()
+      .then((alertas) => {
+        setAlertasNoLeidas(alertas.filter((a) => !a.leida).length);
+        return notificarAlertasNuevas(alertas);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -148,12 +159,31 @@ export default function PalmicultorDashboard({ navigation }) {
       {/* Accesos directos agronómicos */}
       <Text style={styles.sectionTitle}>Mi Finca</Text>
       <View style={styles.gridRow}>
-        <ShortcutCard icon="leaf-outline" title="Mis Lotes" onPress={() => navigation.navigate('Lotes')} />
+        <ShortcutCard icon="leaf-outline" title="Mis Fincas y Lotes" onPress={() => navigation.navigate('Fincas')} />
         <ShortcutCard icon="bar-chart-outline" title="Producción" onPress={() => navigation.navigate('Produccion')} />
       </View>
       <View style={styles.gridRow}>
         <ShortcutCard icon="trending-up-outline" title="Pronósticos" onPress={() => navigation.navigate('Pronosticos')} />
-        <ShortcutCard icon="notifications-outline" title="Alertas de Cosecha" onPress={() => navigation.navigate('Alertas')} />
+        <ShortcutCard
+          icon="notifications-outline"
+          title="Alertas de Cosecha"
+          subtitle={alertasNoLeidas > 0 ? `${alertasNoLeidas} nueva(s)` : undefined}
+          onPress={() => navigation.navigate('Alertas')}
+        />
+      </View>
+
+      {/* Mercado */}
+      <Text style={styles.sectionTitle}>Mercado</Text>
+      <View style={styles.gridRow}>
+        <ShortcutCard icon="storefront-outline" title="Mis Publicaciones" onPress={() => navigation.navigate('MisPublicaciones')} />
+        <ShortcutCard icon="flask-outline" title="Balance Industrial" onPress={() => navigation.navigate('BalanceIndustrial')} />
+      </View>
+
+      {/* Herramientas */}
+      <Text style={styles.sectionTitle}>Herramientas</Text>
+      <View style={styles.gridRow}>
+        <ShortcutCard icon="chatbubble-ellipses-outline" title="Simulador SMS/USSD" onPress={() => navigation.navigate('SmsSimulador')} />
+        <ShortcutCard icon="person-outline" title="Mi Perfil" onPress={() => navigation.navigate('Perfil')} />
       </View>
     </ScrollView>
   );

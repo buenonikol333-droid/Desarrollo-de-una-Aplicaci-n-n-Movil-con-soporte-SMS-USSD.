@@ -32,3 +32,21 @@ export async function getCompradoresCercanos() {
 export async function publicarProducto(payload) {
   return apiRequest('/mercado/publicaciones', { method: 'POST', body: payload });
 }
+
+export const misPublicaciones = () => apiRequest('/mercado/publicaciones');
+export const editarPublicacion = (id, payload) =>
+  apiRequest(`/mercado/publicaciones/${id}`, { method: 'PUT', body: payload });
+export const cambiarEstadoPublicacion = (id, estado) =>
+  apiRequest(`/mercado/publicaciones/${id}/estado`, { method: 'PATCH', body: { estado } });
+
+export async function vitrinaPublica(filtros = {}) {
+  const params = new URLSearchParams();
+  if (filtros.municipio) params.set('municipio', filtros.municipio);
+  if (filtros.precio_min) params.set('precio_min', filtros.precio_min);
+  if (filtros.precio_max) params.set('precio_max', filtros.precio_max);
+  const qs = params.toString();
+  return apiRequest(`/mercado/vitrina${qs ? `?${qs}` : ''}`);
+}
+
+export const detallePublicacion = (id) => apiRequest(`/mercado/publicaciones/${id}/detalle`);
+export const detalleComprador = (id) => apiRequest(`/compradores/${id}`);

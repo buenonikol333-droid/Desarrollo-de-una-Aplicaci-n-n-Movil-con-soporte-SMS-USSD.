@@ -71,10 +71,13 @@ class CicloCosecha(db.Model):
     fecha_ultima_cosecha = db.Column(db.Date)
     fecha_inicio = db.Column(db.Date)
     duracion_dias = db.Column(db.Integer)  # 7-12 jóvenes / 9-15 adultas (RN03)
+    dias_anticipacion_alerta = db.Column(db.Integer, default=3)  # 1-7 días (RN03)
     proxima_fecha_estimada = db.Column(db.Date)
     observaciones = db.Column(db.Text)
     estado = db.Column(db.String(20), default="Programado")
     # Programado | Próximo | En curso | Completado | Retrasado
+
+    alertas = db.relationship("Notificacion", backref="ciclo_cosecha", lazy=True)
 
 
 class RegistroPolinizacion(db.Model):
@@ -106,6 +109,10 @@ class RegistroProduccion(db.Model):
     peso_promedio_racimo = db.Column(db.Float)
     fruto_suelto = db.Column(db.Float)
     observaciones = db.Column(db.Text)
+    fuente = db.Column(db.String(20), default="app")  # app | sms | ussd
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    pronosticos = db.relationship("PronosticoProduccion", backref="registro_produccion", lazy=True)
 
 
 class PronosticoProduccion(db.Model):
@@ -113,11 +120,18 @@ class PronosticoProduccion(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     lote_id = db.Column(db.Integer, db.ForeignKey("lotes.id"), nullable=False)
+    registro_produccion_id = db.Column(db.Integer, db.ForeignKey("registros_produccion.id"), nullable=True)
     fecha_calculo = db.Column(db.DateTime, default=datetime.utcnow)
+    palmas_totales = db.Column(db.Integer)
+    palmas_improductivas_muestra = db.Column(db.Integer)
+    palmas_productivas = db.Column(db.Float)
+    palmas_productivas_muestreadas = db.Column(db.Integer)
+    promedio_estructuras = db.Column(db.Float)
     racimos_estimados = db.Column(db.Float)
     peso_promedio = db.Column(db.Float)
     produccion_estimada_kg = db.Column(db.Float)
     produccion_estimada_ton = db.Column(db.Float)
+    distribucion_mensual = db.Column(db.JSON)  # [{mes, porcentaje, produccion_kg, produccion_ton}, ...]
     metodologia = db.Column(db.String(100), default="RN04 - muestreo 4-5%")
     observaciones = db.Column(db.Text)
 
@@ -129,9 +143,11 @@ class Transportador(db.Model):
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False, unique=True)
     ubicacion = db.Column(db.String(200))
     disponible = db.Column(db.Boolean, default=True)
+    estado = db.Column(db.String(20), default="pendiente")  # pendiente | aprobado | rechazado
     fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     vehiculos = db.relationship("Vehiculo", backref="transportador", lazy=True)
+    solicitudes = db.relationship("SolicitudTransporte", backref="transportador", lazy=True)
 
 
 class Vehiculo(db.Model):
@@ -209,8 +225,11 @@ class SolicitudTransporte(db.Model):
     tarifa_sugerida = db.Column(db.Numeric(12, 2))
     tarifa_acordada = db.Column(db.Numeric(12, 2))
     observaciones = db.Column(db.Text)
+    motivo_rechazo = db.Column(db.Text)
+    fecha_aceptacion = db.Column(db.DateTime)  # dispara la revelación de ubicación exacta (RN06)
+    fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     estado = db.Column(db.String(20), default="Pendiente")
-    # Pendiente | Enviada | Aceptada | Rechazada | En camino | Completada | Cancelada
+    # Pendiente | Aceptada | Rechazada | En preparación | En tránsito | Entregada | Cancelada
 
 
 class Notificacion(db.Model):
@@ -218,8 +237,83 @@ class Notificacion(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    ciclo_cosecha_id = db.Column(db.Integer, db.ForeignKey("ciclos_cosecha.id"), nullable=True)
+    lote_id = db.Column(db.Integer, db.ForeignKey("lotes.id"), nullable=True)
     tipo = db.Column(db.String(50))
     titulo = db.Column(db.String(150))
     mensaje = db.Column(db.Text)
+    enlace = db.Column(db.String(50))  # nombre de pantalla destino en la app
     leida = db.Column(db.Boolean, default=False)
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class EstadoVia(db.Model):
+    __tablename__ = "estados_vias"
+
+    id = db.Column(db.Integer, primary_key=True)
+    via = db.Column(db.String(150), nullable=False)
+    municipio = db.Column(db.String(100), default="Tumaco")
+    estado = db.Column(db.String(20), default="habilitada")
+    # habilitada | precaucion | restringida | cerrada
+    observaciones = db.Column(db.Text)
+    actualizado_por = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = "password_reset_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    codigo = db.Column(db.String(6), nullable=False)
+    expira_en = db.Column(db.DateTime, nullable=False)
+    usado = db.Column(db.Boolean, default=False)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship("Usuario", backref="reset_tokens")
+
+
+class SmsUssdLog(db.Model):
+    __tablename__ = "sms_ussd_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    telefono = db.Column(db.String(20), nullable=False)
+    canal = db.Column(db.String(10), default="sms")  # sms | ussd
+    comando = db.Column(db.String(50))
+    payload = db.Column(db.Text)
+    respuesta = db.Column(db.Text)
+    estado = db.Column(db.String(20), default="procesado")  # procesado | error
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True)
+    creado_en = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship("Usuario", backref="sms_logs")
+
+
+class BalanceIndustrial(db.Model):
+    __tablename__ = "balances_industriales"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    pronostico_id = db.Column(db.Integer, db.ForeignKey("pronosticos_produccion.id"), nullable=True)
+    entrada_kg = db.Column(db.Float, nullable=False)
+    desglose = db.Column(db.JSON)  # {humedad, tusas, fibras, aguas_impurezas, cuesco, palmiste, aceite_crudo}
+    aceite_crudo_kg = db.Column(db.Float)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship("Usuario", backref="balances_industriales")
+    pronostico = db.relationship("PronosticoProduccion", backref="balances_industriales")
+
+
+class PublicacionMercado(db.Model):
+    __tablename__ = "publicaciones_mercado"
+
+    id = db.Column(db.Integer, primary_key=True)
+    palmicultor_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    lote_id = db.Column(db.Integer, db.ForeignKey("lotes.id"), nullable=True)
+    cantidad_toneladas = db.Column(db.Float, nullable=False)
+    precio_esperado = db.Column(db.Numeric(12, 2))
+    unidad = db.Column(db.String(50), default="Tonelada")
+    municipio = db.Column(db.String(100), default="Tumaco")
+    descripcion = db.Column(db.Text)
+    estado = db.Column(db.String(20), default="activa")  # activa | vendida | cancelada
+    fecha_publicacion = db.Column(db.DateTime, default=datetime.utcnow)
